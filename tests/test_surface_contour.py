@@ -1,4 +1,8 @@
-"""Independent surface pixels and analytic open curves for the studio workflow."""
+"""Validate surface sampling and seat-drop measurements against analytic curves.
+
+The v0.6.0 cases cover order-independent manual ellipse fitting and rejection
+of nearly straight point sets in the geometry-only preview.
+"""
 
 import io
 import json

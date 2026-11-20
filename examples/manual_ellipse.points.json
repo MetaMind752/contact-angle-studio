@@ -1,0 +1,57 @@
+{
+  "format": "contact-angle-studio-coordinates-v1",
+  "image": {
+    "filename": "manual_ellipse.png",
+    "width": 900,
+    "height": 760,
+    "sha256": "5551f3549b6db368ada7171d6bf978d4fb0edbcfb51bbdd28ffdbf42fe751c50"
+  },
+  "options": {
+    "mode": "manual",
+    "orientation": "sessile",
+    "baseline": [
+      {
+        "x": 100.0,
+        "y": 590.0
+      },
+      {
+        "x": 800.0,
+        "y": 590.0
+      }
+    ],
+    "baseline_points": [
+      {
+        "x": 100.0,
+        "y": 590.0
+      },
+      {
+        "x": 800.0,
+        "y": 590.0
+      }
+    ],
+    "baseline_source": "manual",
+    "contour_points": [
+      {
+        "x": 251.77133958268743,
+        "y": 586.0986621559794
+      },
+      {
+        "x": 255.33679160674146,
+        "y": 418.1477608846102
+      },
+      {
+        "x": 442.2244098453376,
+        "y": 320.2535360704038
+      },
+      {
+        "x": 646.8626426579752,
+        "y": 409.71795614164
+      },
+      {
+        "x": 656.2286604173125,
+        "y": 586.0986621559794
+      }
+    ],
+    "manual_method": "ellipse"
+  }
+}

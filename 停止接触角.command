@@ -1,4 +1,5 @@
 #!/bin/zsh
+# Stop the background service for the selected local image library.
 # Reuse the launcher's Python discovery and exact data-directory selection.
 set -u
 studio_project_dir="${0:A:h}"

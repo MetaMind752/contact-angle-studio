@@ -1,4 +1,5 @@
 #!/bin/zsh
+# Open the browser after the local background service is ready.
 # :A resolves a shortcut/symlink to the source so moving the folder and spaces work.
 set -u
 studio_project_dir="${0:A:h}"

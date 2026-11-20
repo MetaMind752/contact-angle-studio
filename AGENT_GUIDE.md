@@ -35,6 +35,7 @@ API 与界面共用资料库。服务默认只监听 `127.0.0.1`，无需 OpenAI
 | 上传图片 | `POST /api/images`，multipart字段 `image` |
 | 原图预览 | `GET /api/images/{image_id}/preview.png` |
 | 自动基线建议 | `GET /api/images/{image_id}/baseline` |
+| 预览手动液滴轮廓 | `POST /api/images/{image_id}/contour-preview`，提交至少 5 个 `contour_points`、可用的 `baseline` 和 `orientation`；悬滴可附 `surface_curve` |
 | 预览手动表面点拟合 | `POST /api/images/{image_id}/baseline`，提交草稿格式的参数和 `baseline_source: "manual"` |
 | 读取 / 保存当前点位草稿 | `GET / PUT /api/images/{image_id}/draft` |
 | 提交测量 | `POST /api/jobs` |

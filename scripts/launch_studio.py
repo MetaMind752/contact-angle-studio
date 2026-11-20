@@ -3,7 +3,8 @@
 
 This file uses only the Python standard library so it also runs before the
 application dependencies are installed. The child server is bound to loopback;
-only this launcher's own child process is stopped during cleanup.
+only this launcher's own child process is stopped during cleanup. Use --check
+for an environment check or --status to locate the running local workbench.
 """
 
 from __future__ import annotations

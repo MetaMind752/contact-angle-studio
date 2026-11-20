@@ -1,6 +1,9 @@
+# Local environment, image library, and batch outputs.
 .venv/
 data/
 results/
+
+# Python build artifacts and local tool caches.
 build/
 dist/
 __pycache__/

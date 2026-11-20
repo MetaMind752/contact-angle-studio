@@ -13,6 +13,10 @@ dependencies = [
   "python-multipart>=0.0.18,<1", "pillow>=11,<13",
 ]
 
+[project.urls]
+Repository = "https://github.com/MetaMind752/contact-angle-studio"
+Changelog = "https://github.com/MetaMind752/contact-angle-studio/releases"
+
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "httpx>=0.27,<1", "ruff>=0.9,<1"]
 

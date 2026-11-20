@@ -1,3 +1,5 @@
+# v0.6.0 validation environment (macOS arm64, Python 3.13).
+# Includes the tools used to run pytest and Ruff. Runtime ranges are in pyproject.toml.
 annotated-doc==0.0.6
 annotated-types==0.8.0
 anyio==4.16.0

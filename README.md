@@ -1,5 +1,7 @@
 # 接触角工作台 v0.6.0
 
+[下载 v0.6.0（macOS ZIP）](https://github.com/MetaMind752/contact-angle-studio/releases/download/v0.6.0/contact-angle-studio-v0.6.0.zip) · [发布说明](https://github.com/MetaMind752/contact-angle-studio/releases/tag/v0.6.0) · [手动椭圆示例](examples/README.md)
+
 个人使用请双击 **启动接触角.command**：它会启动完整本机前端与 Python 后端，并打开浏览器。支持自动轮廓拟合、多点表面基线拟合、统一液滴轮廓打点、受限缩放拖动、精确坐标编辑、历史记录，以及绘有接触点、切线和角度弧线的 PNG 导出。详细操作见 [个人使用说明](README_STUDIO.md)，Codex/浏览器代理操作见 [AGENT_GUIDE.md](AGENT_GUIDE.md)。无需前端构建工具或在线模型。
 
 工作台可直接处理原始方向的倒置液滴。程序识别基体下缘，估计被液滴挡住的表面，在左右接触点分别计算液相内角。结果和点位始终使用上传照片的左右顺序。
@@ -8,7 +10,7 @@
 
 本目录保留 2026-11-16 的外部 100 图验证：`general.py`、`young_laplace.py` 和 `benchmark/`。工作台提供这些拟合方法供个人测量和核查，外部验证尚未达到三档各 ≥80% 的要求；它们未替换原命令行与 `/measure` 接口的默认方法。具体调用和限制见文末。
 
-## 当前测量范围
+## 核心 CLI 与 /measure 接口的测量范围
 
 - 固体上方的单个静态座滴，图片中液滴与背景有可识别的明暗边界。
 - 手动指定基线；坐标以原图左上角为原点，x 向右、y 向下，单位为像素。
@@ -42,7 +44,7 @@ python -m pip install -r requirements-lock.txt
 python -m pip install -e . --no-deps
 ```
 
-`requirements-lock.txt` 记录本次验证的精确依赖版本（包含测试工具）；其他平台若缺少相应 wheel，可用 `pip install -e '.[dev]'` 重新解析兼容依赖，并运行测试。普通用户安装包尚未制作。
+`requirements-lock.txt` 记录本次验证的精确依赖版本（包含测试工具）；其他平台若缺少相应 wheel，可用 `pip install -e '.[dev]'` 重新解析兼容依赖，并运行测试。工作台 ZIP 包包含 macOS 启动脚本。首次运行时脚本会在项目内准备 Python 环境。
 
 ## 一次命令完成测量
 
@@ -164,8 +166,6 @@ python examples/generate_examples.py
 - [SciPy 鲁棒最小二乘](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.least_squares.html)
 - [FastAPI 文件与表单接口](https://fastapi.tiangolo.com/tutorial/request-forms-and-files/)
 - [KRÜSS 接触角拟合方法说明](https://www.kruss-scientific.com/files/kruss-tn314-en.pdf)
-
-未来发布 GitHub 时，可以继续使用本项目结构，添加许可证、自动测试及各系统分发包。
 
 ## 本次验证的输出示例
 
