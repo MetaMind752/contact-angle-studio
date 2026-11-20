@@ -14,6 +14,7 @@ from PIL import Image
 
 from . import __version__
 from .core import Frame, _extract, _local_side, decode_image, measure_bytes
+from .manual_arc import MIN_MANUAL_POINTS
 from .models import MeasurementError, MeasurementOptions
 from .studio_annotation import annotate
 from .studio_store import write_json
@@ -56,7 +57,7 @@ def manual_orientation(options):
     if (
         orientation != "auto"
         or options.get("mode") != "manual"
-        or len(contour) < 7
+        or len(contour) < MIN_MANUAL_POINTS
         or len(surface) < 2
     ):
         return orientation

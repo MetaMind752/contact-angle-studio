@@ -17,7 +17,7 @@ def pendant_job(gray, options):
         marks = options.get("baseline_points") or options.get("baseline")
     contours = options.get("contour_points") if manual else None
     if manual and not contours:
-        raise MeasurementError("contour_required", "请从一侧接触区沿悬滴边缘打点到另一侧。")
+        raise MeasurementError("contour_required", "请沿悬滴边缘选取至少 5 个点。")
 
     ex = list(options.get("excluded_regions") or []) if not manual else []
     roi = options.get("roi") if not manual else None

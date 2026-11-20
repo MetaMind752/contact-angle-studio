@@ -40,3 +40,9 @@ class StudioOptions(Model):
 class JobRequest(Model):
     image_id: str = Field(pattern=r"^[a-f0-9]{32}$")
     options: StudioOptions
+
+
+class ContourPreviewRequest(Model):
+    contour_points: list[Point] = Field(max_length=400)
+    baseline: tuple[Point, Point] | None = None
+    orientation: Orientation = "auto"

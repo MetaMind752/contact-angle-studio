@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 from scipy.optimize import brentq, least_squares
 
+from .manual_arc import contour_observations, measure_partial_contour, spans_interface
 from .models import MeasurementError
 
 
@@ -313,17 +314,20 @@ def fit_pendant(image, surface, sensitivity=True, contour_points=None, excluded_
     diagnostics = {"surface_shift_px": uncertainty}
     coords = []
     if manual:
-        if not 7 <= len(contour_points) <= 400:
-            _error("悬滴手动轮廓需要 7–400 个连续相异点。")
-        pts = _xy(contour_points)
-        if not np.isfinite(pts).all() or np.any(pts < 0) or np.any(pts >= [w, h]):
-            _error("轮廓点须在原图范围内。")
-        if len(np.unique(pts, axis=0)) != len(pts):
-            _error("手动轮廓包含重复点。")
+        pts = contour_observations(contour_points, w, h)
+        depth = pts[:, 1] - surf(pts[:, 0])
+        if not spans_interface(depth, max(10, 0.075 * np.ptp(pts[:, 1]))):
+            result = measure_partial_contour(
+                pts, w, h, surface["baseline"], sensitivity, surf, uncertainty
+            )
+            result.update(
+                surface_curve=surface.get("surface_curve", surface["baseline"]),
+                baseline_points=obs,
+                contour_diagnostics=diagnostics,
+            )
+            return result
         if pts[0, 0] > pts[-1, 0]:
             pts = pts[::-1].copy()
-        if max(pts[[0, -1], 1] - surf(pts[[0, -1], 0])) > max(10, 0.075 * np.ptp(pts[:, 1])):
-            _error("请将端点放在可见接触区附近。")
 
         depth = pts[:, 1] - surf(pts[:, 0])
         peak = int(np.argmax(depth))

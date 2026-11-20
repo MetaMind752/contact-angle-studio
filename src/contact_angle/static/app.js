@@ -4,7 +4,8 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const COLORS = {left: '#d36c39', right: '#168c80', baseline: '#3c7cdb', contour: '#8662b0', both: '#96a6ba'};
 const DEFAULT_OPTIONS = {mode: 'auto', algorithm: 'general', orientation: 'auto', baseline: null, baseline_points: [], baseline_source: 'automatic', baseline_method: null, contour_points: [], left_points: [], right_points: [], manual_method: 'spline', sensitivity: true, polarity: 'dark', roi: null, excluded_regions: []};
 const GROUP_NAMES = {baseline: '表面', contour: '轮廓'};
-const TOOL_HINTS = {pan: '', baseline: '在液滴两侧的固体表面边缘选点', contour: '从一侧接触区沿液滴轮廓到另一侧，至少 7 点', roi: '框选完整液滴及接触线，至少 24 × 24 px'};
+const MIN_CONTOUR_POINTS = 5;
+const TOOL_HINTS = {pan: '', baseline: '在液滴两侧的固体表面边缘选点', contour: '沿可见的液滴边缘选点', roi: '框选完整液滴及接触线'};
 const state = {images: [], caches: new Map(), currentId: null, selectionEpoch: 0, tool: 'pan', pointTab: 'baseline', selectedPoint: null, view: null, manualScale: null, drag: null, space: false, uploading: false, loadController: null, pollController: null, toastTimer: null, draftTimer: null, maxUpload: 20 * 1024 * 1024};
 const $ = (id) => document.getElementById(id);
 const clone = (value) => JSON.parse(JSON.stringify(value));
@@ -141,20 +142,21 @@ function renderLibrary() {
   if (!images.length) { list.append(element('p', 'library-empty', query ? '没有匹配图片' : '暂无图片')); return; }
   for (const image of images) {
     const cache = state.caches.get(image.id), card = element('button', 'image-card' + (image.id === state.currentId ? ' active' : ''));
-    card.type = 'button'; card.setAttribute('aria-label', '打开图片 ' + image.filename); card.setAttribute('aria-pressed', String(image.id === state.currentId)); card.title = image.filename + '（' + image.width + ' × ' + image.height + ' px）';
+    card.type = 'button'; card.setAttribute('aria-label', '打开图片 ' + image.filename); card.setAttribute('aria-pressed', String(image.id === state.currentId)); card.title = image.filename;
     const thumbnail = element('img'); thumbnail.src = image.preview_url || '/api/images/' + encodeURIComponent(image.id) + '/preview.png'; thumbnail.alt = ''; thumbnail.loading = 'lazy'; card.append(thumbnail);
-    card.append(element('span', 'image-card-name', image.filename));
+    const info = element('span', 'image-card-info');
+    info.append(element('span', 'image-card-name', image.filename));
     const last = cache?.pendingJob ? '拟合中' : cache?.result || cache?.history.some((j) => j.state === 'done') ? '已测量' : '';
-    const meta = element('span', 'image-card-meta');
-    meta.append(element('span', '', image.width + ' × ' + image.height));
-    if (last) meta.append(element('span', 'image-state', last));
-    card.append(meta);
+    if (last) info.append(element('span', 'image-state', last));
+    card.append(info);
     card.addEventListener('click', () => selectImage(image.id)); list.append(card);
   }
 }
 async function selectImage(id) {
   if (state.currentId === id && active()?.loaded) return;
   const oldId = state.currentId; clearTimeout(state.draftTimer); if (oldId) saveDraft(oldId);
+  cancelContourPreview(active());
+  setText('cursor-coordinates', '');
   state.loadController?.abort(); state.pollController?.abort();
   const controller = new AbortController(); state.loadController = controller;
   state.currentId = id; state.selectionEpoch += 1; const epoch = state.selectionEpoch;
@@ -268,6 +270,49 @@ function queueSurfacePreview(cache) {
     }
   }, 120);
 }
+function cancelContourPreview(cache) {
+  const preview = cache?.contourPreview;
+  if (!preview?.controller) return;
+  clearTimeout(preview.timer);
+  preview.controller.abort();
+  cache.contourPreview = null;
+}
+function queueContourPreview(cache) {
+  const options = cache?.options;
+  if (!cache?.loaded || cache.result || options.mode !== 'manual' ||
+      options.contour_points.length < MIN_CONTOUR_POINTS) {
+    cancelContourPreview(cache);
+    if (cache && !cache.result) cache.contourPreview = null;
+    return;
+  }
+  const orientation = options.orientation === 'auto' && (options.baseline_method || cache.direction)
+    ? (isPendant(cache) ? 'pendant' : 'sessile')
+    : options.orientation;
+  const body = {contour_points: options.contour_points, baseline: options.baseline, orientation};
+  const key = JSON.stringify(body);
+  if (cache.contourPreview?.key === key) return;
+  cancelContourPreview(cache);
+  const preview = {key, controller: new AbortController()};
+  const {controller} = preview;
+  const id = state.currentId;
+  const epoch = state.selectionEpoch;
+  cache.contourPreview = preview;
+  preview.timer = setTimeout(async () => {
+    try {
+      const data = await request('/api/images/' + encodeURIComponent(id) + '/contour-preview',
+        jsonRequest('POST', JSON.parse(key), controller.signal));
+      preview.points = data.points;
+    } catch (error) {
+      if (!controller.signal.aborted) preview.error = error.message;
+    } finally {
+      preview.controller = null;
+    }
+    if (cache.contourPreview === preview && isCurrent(id, epoch)) {
+      renderStage();
+      renderRun();
+    }
+  }, 120);
+}
 async function estimateBaseline(announce = true) {
   const id = state.currentId, cache = active(); if (!cache?.loaded) return;
   const requestId = Symbol(); cache.estimateId = requestId;
@@ -324,8 +369,7 @@ function renderAll() {
   renderLibrary();
   visible('image-canvas', Boolean(image)); visible('empty-stage', !image);
   setText('current-filename', image?.filename || '接触角测量');
-  setText('current-metadata', image ? image.width + ' × ' + image.height + ' px' : '');
-  visible('current-metadata', Boolean(image)); visible('stage-status', Boolean(image));
+  visible('stage-status', Boolean(image));
   for (const id of ['estimate-baseline','draw-baseline','mode-auto','mode-manual','algorithm-select','orientation-select','polarity-select','sensitivity-toggle','import-coordinates','export-coordinates','zoom-in','zoom-out','fit-view','actual-view','clear-roi','clear-exclusions']) $(id).disabled = !cache?.loaded;
   $('refresh-history').disabled = !cache;
   $('estimate-baseline').disabled = !cache?.loaded || cache.estimating;
@@ -348,18 +392,20 @@ function renderAll() {
     setText('baseline-state', hasBase ? o.baseline_source === 'automatic' ? '自动' : '手动' : '未完成');
     $('baseline-state').classList.toggle('ready', hasBase);
     visible('roi-summary', Boolean(o.roi));
-    if (o.roi) setText('roi-description', '区域 ' + o.roi.width + ' × ' + o.roi.height + ' px');
+    if (o.roi) setText('roi-description', '已框选区域');
     const exclusions = o.excluded_regions || [], applyingExclusions = o.mode === 'auto' && (o.algorithm === 'local' || isPendant(cache));
     visible('exclusion-summary', exclusions.length > 0);
     $('exclusion-summary').classList.toggle('warning', !applyingExclusions);
     setText('exclusion-description', applyingExclusions ? exclusions.length + ' 个忽略区域' : '忽略区域仅适用于自动局部拟合；手动测量请按选点绕开遮挡。');
   } else { setText('baseline-state', '未设置'); $('baseline-state').classList.remove('ready'); visible('roi-summary', false); visible('exclusion-summary', false); }
+  queueContourPreview(cache);
   renderTools(); renderPoints(); renderStage(); renderResults(); renderHistory(); renderRun(); renderDraftStatus();
   if (cache?.loaded) queueSurfacePreview(cache);
 }
 function renderPoints() {
   const cache = active(), options = cache?.options;
   for (const group of ['baseline','contour']) setText(group + '-count', options ? pointsFor(options, group).length : 0);
+  if ($('coordinate-panel').hidden) return;
   document.querySelectorAll('[data-point-tab]').forEach((b) => { b.classList.toggle('active', b.dataset.pointTab === state.pointTab); b.setAttribute('aria-selected', String(b.dataset.pointTab === state.pointTab)); });
   const table = $('point-table-body'); table.replaceChildren();
   const points = options ? pointsFor(options, state.pointTab) : [], image = activeImage();
@@ -483,6 +529,10 @@ function renderStage() {
     const [a,b] = [...baseline].sort((p,q) => p.x-q.x), slope = (b.y-a.y)/(b.x-a.x || 1);
     geometry.append(svg('path', {d:pathData([{x:0,y:a.y-slope*a.x},{x:image.width,y:a.y+slope*(image.width-a.x)}]),class:'baseline-path'}));
   }
+  const contourPreview = o.mode === 'manual' && !result ? cache.contourPreview?.points : null;
+  if (contourPreview?.length > 1) {
+    geometry.append(svg('path', {d: pathData(contourPreview), class: 'fit-path manual-preview-path'}));
+  }
   if (result) {
     for (const item of result.geometry?.contours || []) geometry.append(svg('path',{d:pathData(item.points || []),class:'contour-path'}));
     for (const item of result.geometry?.fits || []) geometry.append(svg('path',{d:pathData(item.points || []),class:'fit-path',stroke:COLORS[item.side] || COLORS.both}));
@@ -550,7 +600,9 @@ function pointerDown(event) {
 function pointerMove(event) {
   const image = activeImage(), cache = active(); if (!image || !cache) return;
   const p = screenToImage(event.clientX,event.clientY);
-  setText('cursor-coordinates', insideImage(p) ? 'X '+format(p.x,1)+' · Y '+format(p.y,1)+' px' : '');
+  if (!$('coordinate-panel').hidden) {
+    setText('cursor-coordinates', insideImage(p) ? 'X '+format(p.x,1)+' · Y '+format(p.y,1)+' px' : '');
+  }
   if (!state.drag) return;
   const drag = state.drag;
   if (drag.kind === 'pan') {
@@ -571,6 +623,7 @@ function pointerMove(event) {
   const points = pointsFor(cache.options,drag.group); points[drag.index] = boundedPoint(p);
   setPoints(cache.options,drag.group,points);
   if (drag.group==='baseline') cache.options.baseline_source='manual';
+  queueContourPreview(cache);
   renderStage(); renderResults(); renderRun();
 }
 function pointerUp() {
@@ -619,15 +672,23 @@ function validateReady(cache) {
   if(o.mode==='auto' && !isPendant(cache) && o.algorithm!=='local' && o.excluded_regions?.length) return '座滴的忽略区域适用于局部边缘拟合。请切换方法或清除忽略区域。';
   if(o.mode==='manual'){
     if(o.baseline?.length!==2)return '请先设置表面基线。';
-    if(o.contour_points.length<7)return '沿液滴轮廓至少选 7 点，覆盖两侧接触区和顶端。';
+    if(o.contour_points.length < MIN_CONTOUR_POINTS)return '请沿液滴轮廓选取至少 5 个点。';
   }
   return null;
 }
 function renderRun() {
   const cache=active(),button=$('run-button');
-  button.textContent=cache?.pendingJob?'正在拟合…':cache?.estimating?'正在识别基线…':cache&&!cache.loaded?'正在读取草稿…':cache?.options.mode==='manual'?'拟合液滴轮廓':'开始自动拟合';
-  button.disabled=!cache||!cache.loaded||cache.estimating||Boolean(cache.pendingJob);visible('stage-busy',Boolean(cache?.pendingJob));
-  if(cache?.pendingJob)setText('busy-title',cache.pendingJob.state==='queued'?'等待测量':'正在拟合');
+  const manual = cache?.options.mode === 'manual';
+  const notEnoughPoints = manual && cache.options.contour_points.length < MIN_CONTOUR_POINTS;
+  button.textContent = manual ? (cache.pendingJob ? '计算中…' : '计算接触角')
+    : cache?.pendingJob ? '正在拟合…' : cache?.estimating ? '正在识别基线…'
+    : cache && !cache.loaded ? '正在读取草稿…' : '开始自动拟合';
+  button.disabled = !cache?.loaded || Boolean(cache.pendingJob) || (manual ? notEnoughPoints : cache.estimating);
+  visible('stage-busy', Boolean(cache?.pendingJob));
+  if (cache?.pendingJob) setText('busy-title', cache.pendingJob.state === 'queued' ? '等待测量' : manual ? '正在计算接触角' : '正在拟合');
+  const previewError = manual && !cache.result && !cache.pendingJob ? cache.contourPreview?.error : null;
+  setText('contour-preview-error', previewError || '');
+  visible('contour-preview-error', Boolean(previewError && !cache.error));
   visible('measurement-error',Boolean(cache?.error));if(cache?.error)setText('measurement-error',cache.error);
 }
 async function runMeasurement() {
@@ -774,7 +835,7 @@ function keyboard(event){
   if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='z'){event.preventDefault();undo(event.shiftKey);return;}
   if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='y'){event.preventDefault();undo(true);return;}
   if(event.metaKey||event.ctrlKey)return;
-  if(event.code==='Space'){event.preventDefault();state.space=true;renderTools();return;}
+  if(event.code==='Space' && tag !== 'BUTTON' && tag !== 'SUMMARY'){event.preventDefault();state.space=true;renderTools();return;}
   const key=event.key.toLowerCase(),tools={b:'baseline',c:'contour',h:'pan'};
   if(tools[key]){event.preventDefault();setTool(tools[key]);return;}
   if(key==='0'){event.preventDefault();fitView();return;}
@@ -814,6 +875,14 @@ function boot(){
   $('draw-baseline').addEventListener('click',()=>{edit(o=>{setPoints(o,'baseline',[]);o.baseline_source='manual';});setTool('baseline');});
   $('clear-roi').addEventListener('click',()=>edit((o)=>{o.roi=null;}));
   $('clear-exclusions').addEventListener('click',()=>edit((o)=>{o.excluded_regions=[];}));
+  $('coordinate-toggle').addEventListener('click', (event) => {
+    const expanded = $('coordinate-panel').hidden;
+    event.currentTarget.setAttribute('aria-expanded', String(expanded));
+    visible('coordinate-panel', expanded);
+    visible('cursor-coordinates', expanded);
+    if (!expanded) setText('cursor-coordinates', '');
+    renderPoints();
+  });
   $('clear-points').addEventListener('click',()=>{edit((o)=>{setPoints(o,state.pointTab,[]);if(state.pointTab==='baseline')o.baseline_source='manual';});state.selectedPoint=null;renderPoints();});
   $('undo-button').addEventListener('click',()=>undo());$('redo-button').addEventListener('click',()=>undo(true));
   $('zoom-in').addEventListener('click',()=>zoom(1.25));$('zoom-out').addEventListener('click',()=>zoom(.8));$('fit-view').addEventListener('click',fitView);$('actual-view').addEventListener('click',actualView);

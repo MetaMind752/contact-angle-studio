@@ -9,6 +9,7 @@ from scipy.interpolate import splev, splprep
 from scipy.optimize import brentq
 
 from .core import Frame
+from .manual_arc import contour_observations, measure_partial_contour, spans_interface
 from .models import MeasurementError, MeasurementOptions
 
 
@@ -20,7 +21,7 @@ def _point(p):
     return {"x": float(p[0]), "y": float(p[1])}
 
 
-def _curve(uv, frame, width, height, sigma):
+def fit_profile(uv, sigma):
     distances = np.linalg.norm(np.diff(uv, axis=0), axis=1)
     length = float(distances.sum())
     parameter = np.r_[0, np.cumsum(distances)] / length
@@ -36,6 +37,12 @@ def _curve(uv, frame, width, height, sigma):
     rms = float(np.sqrt(np.mean(np.sum((fitted - uv) ** 2, axis=1))))
     if rms > 2:
         _fail("manual_inconsistent_points", "轮廓点的拟合残差超过 2 px。")
+    return tck, parameter, rms
+
+
+def _curve(uv, frame, width, height, sigma):
+    tck, parameter, rms = fit_profile(uv, sigma)
+    length = float(np.linalg.norm(np.diff(uv, axis=0), axis=1).sum())
     allowance = min(0.08, max(12, 0.12 * length) / length)
     apex_t = parameter[np.argmax(uv[:, 1])]
 
@@ -101,35 +108,22 @@ def _curve(uv, frame, width, height, sigma):
 
 def measure_contour(image, options):
     height, width = image.shape[:2]
-    values = options.get("contour_points") or []
-    if not 7 <= len(values) <= 400:
-        _fail("manual_point_count", "轮廓拟合需要 7–400 个连续边缘点。")
-    try:
-        xy = np.asarray([[p["x"], p["y"]] for p in values], float)
-    except (KeyError, ValueError, TypeError) as exc:
-        raise MeasurementError("invalid_manual_points", "轮廓点需要 x、y 数值。") from exc
-    if not np.isfinite(xy).all() or np.any(xy < 0) or np.any(xy >= [width, height]):
-        _fail("manual_point_bounds", "轮廓点须位于原图内。")
-    delta = xy[:, None] - xy[None, :]
-    distance = np.linalg.norm(delta, axis=-1)
-    np.fill_diagonal(distance, np.inf)
-    if np.min(distance) < 0.5:
-        _fail("duplicate_manual_points", "轮廓存在相距不足 0.5 px 的重复点。")
+    xy = contour_observations(options.get("contour_points") or [], width, height)
     try:
         validated = MeasurementOptions(baseline=options.get("baseline"), sensitivity=False)
     except ValueError as exc:
         raise MeasurementError("invalid_baseline", "轮廓拟合需要有效的表面基线。") from exc
     frame = Frame.from_options(validated)
     uv = frame.to_local(xy)
+    if not spans_interface(uv[:, 1], max(8, 0.06 * np.ptp(uv[:, 1]))):
+        return measure_partial_contour(
+            xy, width, height, options["baseline"], options.get("sensitivity", True)
+        )
     if uv[0, 0] > uv[-1, 0]:
         uv, xy = uv[::-1].copy(), xy[::-1].copy()
     peak = int(np.argmax(uv[:, 1]))
-    if peak < 2 or peak > len(uv) - 3:
-        _fail("manual_contour_order", "轮廓点应从一侧接触区经过顶点，连续排列到另一侧。")
     if np.min(uv[:, 1]) < -0.75:
         _fail("manual_below_baseline", "轮廓点位于固体基线下方。")
-    if max(uv[0, 1], uv[-1, 1]) > max(8, 0.06 * np.ptp(uv[:, 1])):
-        _fail("manual_excessive_extrapolation", "轮廓两端离基线过远，需要接触区附近的边缘点。")
     # Reject click-order jumps that would create a bridge across the liquid.
     signs = np.diff(uv[:, 1])
     tolerance = max(1, 0.015 * np.ptp(uv[:, 1]))

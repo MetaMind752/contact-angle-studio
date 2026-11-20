@@ -88,14 +88,12 @@ def test_asymmetric_bezier_does_not_impose_equal_angles():
     assert result["asymmetry_deg"] > 8
 
 
-@pytest.mark.parametrize("bad", ["few", "far", "duplicate", "outside", "order"])
+@pytest.mark.parametrize("bad", ["few", "duplicate", "outside", "order"])
 def test_bad_contour_observations_are_rejected(bad):
     image = np.zeros((650, 800, 3), np.uint8)
     opt = options()
     if bad == "few":
-        opt["contour_points"] = opt["contour_points"][:6]
-    elif bad == "far":
-        opt["contour_points"] = opt["contour_points"][4:-4]
+        opt["contour_points"] = opt["contour_points"][:4]
     elif bad == "duplicate":
         opt["contour_points"][5] = opt["contour_points"][4]
     elif bad == "outside":
@@ -107,6 +105,44 @@ def test_bad_contour_observations_are_rejected(bad):
         )
     with pytest.raises(MeasurementError):
         measure_manual(image, opt)
+
+
+@pytest.mark.parametrize("angle", [45, 90, 150])
+@pytest.mark.parametrize("portion", [slice(1, 6), slice(4, -4), slice(-6, -1)])
+def test_partial_contour_can_estimate_contacts_from_either_side(angle, portion):
+    image = np.zeros((650, 800, 3), np.uint8)
+    opt = options(angle, tilt=8)
+    opt["contour_points"] = opt["contour_points"][portion]
+    result = measure_manual(image, opt)
+    assert result["method_label"] == "手动圆弧估算"
+    assert result["status"] == "review"
+    for side in ("left", "right"):
+        assert result[side]["angle_deg"] == pytest.approx(angle, abs=0.1)
+        assert result[side]["extrapolation_px"] > 0
+        assert result["sensitivity"][side]["max_abs_delta_deg"] < 0.1
+
+
+def test_manual_contour_preview_does_not_measure_or_save(monkeypatch, tmp_path):
+    monkeypatch.setenv("CONTACT_ANGLE_DATA_DIR", str(tmp_path))
+    image = np.zeros((650, 800, 3), np.uint8)
+    raw = cv2.imencode(".png", image)[1].tobytes()
+    opt = options(120)
+    with TestClient(app) as client:
+        upload = client.post("/api/images", files={"image": ("drop.png", raw, "image/png")})
+        uri = f"/api/images/{upload.json()['id']}"
+        request = {"contour_points": opt["contour_points"][1:5], "baseline": opt["baseline"]}
+        assert client.post(uri + "/contour-preview", json=request).status_code == 422
+        request["contour_points"] = opt["contour_points"][1:6]
+        response = client.post(uri + "/contour-preview", json=request)
+        assert response.is_success
+        outline = response.json()
+        assert list(outline) == ["points"]
+        assert len(outline["points"]) > 5
+        assert outline["points"][0] == pytest.approx(opt["contour_points"][0])
+        assert outline["points"][-1] == pytest.approx(opt["contour_points"][-1])
+        assert client.get(uri + "/results").json() == {"results": []}
+        draft = client.get(uri + "/draft").json()["options"]
+        assert not draft or not draft["contour_points"]
 
 
 def test_surface_fit_uses_all_observations_and_rejects_isolated_fiber():

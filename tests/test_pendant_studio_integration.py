@@ -101,7 +101,8 @@ def test_inverted_roi_preserves_original_contact_locations():
         assert result[side]["contact_point"]["y"] == pytest.approx(y, abs=2)
 
 
-def test_manual_marks_recover_direction_without_detectable_silhouette():
+@pytest.mark.parametrize("portion", [slice(None), slice(1, 6), slice(-6, -1)])
+def test_manual_marks_recover_direction_without_detectable_silhouette(portion):
     photo = cv2.imencode(".png", np.full((300, 450), 185, np.uint8))[1].tobytes()
     angle = np.deg2rad(125)
     radius, cx, cy = 84, 210, 125
@@ -113,7 +114,7 @@ def test_manual_marks_recover_direction_without_detectable_silhouette():
         baseline_source="manual",
         baseline_points=[{"x": 70, "y": baseline_y}, {"x": 350, "y": baseline_y}],
         contour_points=[
-            {"x": cx + radius * np.cos(t), "y": cy + radius * np.sin(t)} for t in phase
+            {"x": cx + radius * np.cos(t), "y": cy + radius * np.sin(t)} for t in phase[portion]
         ],
     ).model_dump(mode="json")
     result, _ = measure_studio(photo, options)

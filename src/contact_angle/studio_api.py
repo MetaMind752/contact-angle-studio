@@ -12,8 +12,9 @@ from starlette.concurrency import run_in_threadpool
 
 from . import __version__
 from .core import MAX_IMAGE_PIXELS, MAX_UPLOAD_BYTES, decode_image
+from .manual_arc import contour_observations, point, preview_contour
 from .models import MeasurementError
-from .studio_models import JobRequest, Orientation, StudioOptions
+from .studio_models import ContourPreviewRequest, JobRequest, Orientation, StudioOptions
 from .studio_service import estimate_surface_points, manual_orientation
 from .studio_store import get_store
 
@@ -104,6 +105,19 @@ def preview_surface(image_id: str, options: StudioOptions):
             manual_orientation(options.model_dump(mode="json")),
             marks if options.baseline_source == "manual" else None,
         )
+    except (KeyError, MeasurementError) as exc:
+        raise failure(exc) from exc
+
+
+@router.post("/images/{image_id}/contour-preview")
+def preview_manual_contour(image_id: str, request: ContourPreviewRequest):
+    try:
+        image = get_store().image(image_id)
+        width, height = image["width"], image["height"]
+        options = request.model_dump(mode="json")
+        xy = contour_observations(options["contour_points"], width, height)
+        fitted = preview_contour(xy, width, height, options["baseline"], request.orientation)
+        return {"points": [point(p) for p in fitted]}
     except (KeyError, MeasurementError) as exc:
         raise failure(exc) from exc
 
