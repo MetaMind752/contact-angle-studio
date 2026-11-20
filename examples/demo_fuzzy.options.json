@@ -1,0 +1,14 @@
+{
+  "baseline": [
+    {
+      "x": 120.0,
+      "y": 600.0
+    },
+    {
+      "x": 780.0,
+      "y": 600.0
+    }
+  ],
+  "polarity": "dark",
+  "method": "local_polynomial"
+}

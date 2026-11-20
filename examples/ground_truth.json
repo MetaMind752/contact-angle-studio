@@ -1,0 +1,17 @@
+{
+  "demo_90": {
+    "synthetic": true,
+    "left_angle_deg": 90,
+    "right_angle_deg": 90
+  },
+  "demo_120": {
+    "synthetic": true,
+    "left_angle_deg": 120,
+    "right_angle_deg": 120
+  },
+  "demo_fuzzy": {
+    "synthetic": true,
+    "underlying_cap_angle_deg": 90,
+    "note": "Blur, deterministic noise and protrusions alter the visible boundary; for sensitivity demonstration only."
+  }
+}

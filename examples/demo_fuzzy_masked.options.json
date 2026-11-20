@@ -1,0 +1,28 @@
+{
+  "baseline": [
+    {
+      "x": 120.0,
+      "y": 600.0
+    },
+    {
+      "x": 780.0,
+      "y": 600.0
+    }
+  ],
+  "polarity": "dark",
+  "method": "local_polynomial",
+  "excluded_regions": [
+    {
+      "x": 207,
+      "y": 536,
+      "width": 32,
+      "height": 58
+    },
+    {
+      "x": 661,
+      "y": 536,
+      "width": 37,
+      "height": 53
+    }
+  ]
+}

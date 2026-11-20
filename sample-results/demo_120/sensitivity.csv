@@ -1,0 +1,10 @@
+﻿name,method,status,left_angle_deg,right_angle_deg,left_delta_deg,right_delta_deg,error,parameters_json
+primary,local_polynomial,accepted,119.66103066547511,119.70625694792709,0.0,0.0,,"{""blur_sigma"": 0.8, ""fit_fraction"": 0.12, ""polynomial_degree"": 2, ""threshold"": null}"
+local_d2_window0.08,local_polynomial,accepted,120.0095821499959,120.0479472418461,0.3485514845207831,0.3416902939190152,,"{""blur_sigma"": 0.8, ""fit_fraction"": 0.08, ""polynomial_degree"": 2, ""threshold"": null}"
+local_d2_window0.18,local_polynomial,accepted,118.9361240816082,118.96595445074264,-0.7249065838669111,-0.7403024971844445,,"{""blur_sigma"": 0.8, ""fit_fraction"": 0.18, ""polynomial_degree"": 2, ""threshold"": null}"
+local_d3_window0.08,local_polynomial,accepted,120.2393828732332,120.13896410655225,0.5783522077580869,0.4327071586251634,,"{""blur_sigma"": 0.8, ""fit_fraction"": 0.08, ""polynomial_degree"": 3, ""threshold"": null}"
+local_d3_window0.12,local_polynomial,accepted,120.2925890490886,120.23525931967282,0.6315583836134948,0.5290023717457331,,"{""blur_sigma"": 0.8, ""fit_fraction"": 0.12, ""polynomial_degree"": 3, ""threshold"": null}"
+local_d3_window0.18,local_polynomial,accepted,120.30214073329071,120.36191798289612,0.6411100678156032,0.6556610349690288,,"{""blur_sigma"": 0.8, ""fit_fraction"": 0.18, ""polynomial_degree"": 3, ""threshold"": null}"
+local_smoothing0.5,local_polynomial,accepted,119.65216772958411,119.71837433713749,-0.008862935891002621,0.012117389210402507,,"{""blur_sigma"": 0.5, ""fit_fraction"": 0.12, ""polynomial_degree"": 2, ""threshold"": null}"
+local_smoothing1.2,local_polynomial,accepted,119.69533927168143,119.70510253826667,0.03430860620632359,-0.0011544096604154674,,"{""blur_sigma"": 1.2, ""fit_fraction"": 0.12, ""polynomial_degree"": 2, ""threshold"": null}"
+circle_shape_check,circle,accepted,120.09528394247624,120.09528394247624,0.43425327700113314,0.38902699454915535,,"{""blur_sigma"": 0.8, ""fit_fraction"": 0.12, ""polynomial_degree"": 2, ""threshold"": null}"
