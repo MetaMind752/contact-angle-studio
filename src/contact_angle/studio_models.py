@@ -20,7 +20,7 @@ class StudioOptions(Model):
     left_points: list[Point] = Field(default_factory=list, max_length=200)
     right_points: list[Point] = Field(default_factory=list, max_length=200)
     contour_points: list[Point] = Field(default_factory=list, max_length=400)
-    manual_method: Literal["spline", "quadratic", "cubic", "tangent"] = "spline"
+    manual_method: Literal["ellipse", "spline", "quadratic", "cubic", "tangent"] = "ellipse"
     sensitivity: bool = True
     polarity: Literal["dark", "light"] = "dark"
     roi: ROI | None = None
@@ -46,3 +46,4 @@ class ContourPreviewRequest(Model):
     contour_points: list[Point] = Field(max_length=400)
     baseline: tuple[Point, Point] | None = None
     orientation: Orientation = "auto"
+    surface_curve: list[Point] = Field(default_factory=list, max_length=400)

@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 from scipy.optimize import brentq, least_squares
 
-from .manual_arc import contour_observations, measure_partial_contour, spans_interface
+from .manual_arc import contour_observations, measure_marked_contour, spans_interface
 from .models import MeasurementError
 
 
@@ -297,7 +297,15 @@ def _clean_depth(side, points, surf, scale, h, w):
     }
 
 
-def fit_pendant(image, surface, sensitivity=True, contour_points=None, excluded_regions=None):
+def fit_pendant(
+    image,
+    surface,
+    sensitivity=True,
+    contour_points=None,
+    excluded_regions=None,
+    *,
+    manual_method="spline",
+):
     """Intersect each independent visible interface with its local support curve."""
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == 3 else image
     h, w = gray.shape
@@ -316,9 +324,17 @@ def fit_pendant(image, surface, sensitivity=True, contour_points=None, excluded_
     if manual:
         pts = contour_observations(contour_points, w, h)
         depth = pts[:, 1] - surf(pts[:, 0])
-        if not spans_interface(depth, max(10, 0.075 * np.ptp(pts[:, 1]))):
-            result = measure_partial_contour(
-                pts, w, h, surface["baseline"], sensitivity, surf, uncertainty
+        partial = not spans_interface(depth, max(10, 0.075 * np.ptp(pts[:, 1])))
+        if manual_method == "ellipse" or partial:
+            result = measure_marked_contour(
+                pts,
+                w,
+                h,
+                surface["baseline"],
+                sensitivity,
+                surf,
+                uncertainty,
+                circle_only=manual_method != "ellipse",
             )
             result.update(
                 surface_curve=surface.get("surface_curve", surface["baseline"]),

@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from contact_angle.api import app
 from contact_angle.manual import measure_manual
+from contact_angle.manual_arc import preview_contour
 from contact_angle.models import MeasurementError
 from contact_angle.studio_models import StudioOptions
 from contact_angle.studio_service import estimate_surface_points, measure_studio
@@ -143,6 +144,55 @@ def test_manual_contour_preview_does_not_measure_or_save(monkeypatch, tmp_path):
         assert client.get(uri + "/results").json() == {"results": []}
         draft = client.get(uri + "/draft").json()["options"]
         assert not draft or not draft["contour_points"]
+
+
+def test_default_manual_ellipse_is_convex_with_scrambled_points_and_analytic_tangents():
+    # x = cx + a cos(t) + b sin(t), y = cy + c cos(t) + d sin(t)
+    # Fix the endpoints on one sloping-in-image ellipse, above a flat support.
+    center = np.array([350, 400])
+    transform = np.array([[154.0, 36.0], [35.0, 94.0]])
+    height = 416.0
+    amplitude = np.linalg.norm(transform[1])
+    peak = np.arctan2(94, 35)
+    half = np.arccos((height - center[1]) / amplitude)
+    right, left = peak - half, peak + half
+
+    def expected(phase, direction):
+        tangent = transform @ [-np.sin(phase), np.cos(phase)]
+        return np.degrees(np.arctan2(abs(tangent[1]), direction * tangent[0]))
+
+    # Above the line is the complementary arc, so the contact at the smaller
+    # x is the phase named left. Traverse it in reverse to evaluate the tangent.
+    cap = np.linspace(left, right + 2 * np.pi, 17)
+    xy = np.c_[np.cos(cap), np.sin(cap)] @ transform.T + center
+    xy = xy[np.random.default_rng(172).permutation(len(xy))]
+    to_point = lambda p: dict(zip(("x", "y"), p.tolist()))
+    baseline = [{"x": 60.0, "y": height}, {"x": 750.0, "y": height}]
+    options = StudioOptions(
+        mode="manual",
+        orientation="sessile",
+        baseline=baseline,
+        contour_points=[to_point(p) for p in xy],
+        sensitivity=False,
+    ).model_dump(mode="json")
+    assert options["manual_method"] == "ellipse"
+    result = measure_manual(np.zeros((650, 800, 3), np.uint8), options)
+    assert result["method_label"] == "手动椭圆拟合"
+    assert result["left"]["angle_deg"] == pytest.approx(expected(left, 1), abs=0.1)
+    assert result["right"]["angle_deg"] == pytest.approx(expected(right, 1), abs=0.1)
+    preview = preview_contour(xy, 800, 650, baseline, "sessile")
+    edges = np.diff(preview, axis=0)
+    turns = edges[:-1, 0] * edges[1:, 1] - edges[:-1, 1] * edges[1:, 0]
+    assert np.all(turns > 0) or np.all(turns < 0)
+    for index, side in [(0, "left"), (-1, "right")]:
+        assert to_point(preview[index]) == pytest.approx(result[side]["contact_point"])
+
+
+def test_nearly_straight_manual_marks_do_not_preview_an_arbitrary_curve():
+    marks = np.c_[np.arange(200, 250, 10), [295, 295.02, 294.97, 295.01, 295]]
+    with pytest.raises(MeasurementError) as exc:
+        preview_contour(marks, 640, 480, None, "auto")
+    assert exc.value.code == "manual_arc_curvature"
 
 
 def test_surface_fit_uses_all_observations_and_rejects_isolated_fiber():

@@ -6,9 +6,9 @@
 
 1. 打开启动器显示的本机 URL，选择或上传目标图片，核对文件名与原图。
 2. 自动基线来自液滴两侧附近的固体表面边缘采样。“重新选点”可重设多个表面点；蓝色虚线是它们拟合出的基线。
-3. 手动测量选择“轮廓”（C），沿可见边缘打点，第 5 个点会触发轮廓预览。要分别拟合两侧，沿整条可见边缘连续选取至少 7 点，使两端靠近接触区。
+3. 手动测量选择“轮廓”（C），沿可见边缘打点，第 5 个点会触发轮廓预览。覆盖充分时采用椭圆拟合，短弧采用近圆拟合。边缘可见时，在两侧接触区附近补点。
 4. 点击“打点坐标”可进入点表精确输入，展开“导入 / 导出坐标”可应用 JSON。坐标以原图为准。
-5. 点击“计算接触角”，检查曲线、交点和角度。局部边缘模式用同一圆弧外推双侧，方法显示为“手动圆弧估算”。下载标注 PNG、JSON、CSV 或 ZIP。
+5. 点击“计算接触角”，检查曲线、交点和角度。结果显示“手动椭圆拟合”或“手动近圆拟合”。下载标注 PNG、JSON、CSV 或 ZIP。
 6. 缩放使用加减按钮或 Ctrl／⌘ 加滚轮，范围 25%–800%；普通滚轮不会缩放。H 或空格拖动平移，0 适配。
 
 坐标 JSON 示例（数字只演示格式）：
@@ -17,7 +17,7 @@
 {
   "baseline_points": [{"x": 80, "y": 300}, {"x": 120, "y": 300}, {"x": 480, "y": 300}, {"x": 520, "y": 300}],
   "contour_points": [{"x": 180, "y": 300}, {"x": 170, "y": 270}, {"x": 200, "y": 220}, {"x": 300, "y": 190}, {"x": 400, "y": 220}, {"x": 430, "y": 270}, {"x": 420, "y": 300}],
-  "manual_method": "spline",
+  "manual_method": "ellipse",
   "mode": "manual"
 }
 ```
@@ -43,7 +43,7 @@ API 与界面共用资料库。服务默认只监听 `127.0.0.1`，无需 OpenAI
 | 标注 PNG | `GET /api/results/{job_id}/annotation.png` |
 | JSON / CSV / ZIP | `GET /api/results/{job_id}/result.json`、`results.csv`、`bundle.zip` |
 
-手动测量请求使用 `{"image_id":"图片ID","options":{...}}`，其中 `options` 使用上面的 `baseline_points`、`contour_points`、`manual_method: "spline"`、`mode: "manual"`。设置 `sensitivity: true` 比较候选曲线。自动模式使用 `mode: "auto"`；轮廓点不会参与自动轮廓识别。
+手动测量请求使用 `{"image_id":"图片ID","options":{...}}`，其中 `options` 使用上面的 `baseline_points`、`contour_points`、`manual_method: "ellipse"`、`mode: "manual"`。设置 `sensitivity: true` 比较点位与表面位置变化下的角度。自动模式使用 `mode: "auto"`；轮廓点不会参与自动轮廓识别。
 
 接口返回202后，按任务ID查询状态。`queued` 和 `running` 尚未完成；`done` 的 `result` 包含左右角、基线、几何曲线、敏感性和导出链接；`error` 的原因应保留并告知用户。不要在更改图片或点位后继续显示旧结果为当前结果。
 

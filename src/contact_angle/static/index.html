@@ -4,14 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#202a2b">
-  <title>滴角 · 接触角测量工作台</title>
+  <title>接触角工作台</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='13' fill='%23202a2b'/%3E%3Cpath d='M13 31a13 13 0 1 1 22 0M9 33h30' fill='none' stroke='white' stroke-width='3'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/styles.css?v=0.5.2">
+  <link rel="stylesheet" href="/static/styles.css?v=0.6.0">
 </head>
 <body>
   <header class="app-header">
-    <a class="brand" href="/" aria-label="滴角，接触角测量工作台"><span class="brand-mark"><svg viewBox="0 0 36 36" aria-hidden="true"><path d="M7 25a12 12 0 1 1 22 0M4 27h28"/></svg></span><span>滴角</span></a><span class="product-name">接触角测量工作台</span>
-    <div class="header-actions"><button class="button subtle" id="help-button" type="button" aria-label="帮助" title="使用帮助"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="/static/icons.svg#circle-help"/></svg><span>帮助</span></button><button class="button subtle" id="demo-button" type="button">示例</button><button class="button primary" id="upload-button" type="button"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="/static/icons.svg#folder-input"/></svg>导入图片</button></div>
+    <span class="product-name">接触角工作台</span>
+    <div class="header-actions">
+      <button class="button subtle" id="shortcuts-button" type="button" aria-haspopup="dialog">快捷键</button>
+      <button class="button subtle" id="tutorial-button" type="button" aria-haspopup="dialog">教程</button>
+      <button class="button subtle" id="demo-button" type="button">示例</button>
+      <button class="button primary" id="upload-button" type="button"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="/static/icons.svg#folder-input"/></svg>导入图片</button>
+    </div>
     <input id="file-input" type="file" multiple hidden>
   </header>
 
@@ -39,7 +44,7 @@
         <div class="stage-busy" id="stage-busy" hidden aria-live="polite"><span class="spinner"></span><strong id="busy-title">正在拟合</strong></div>
         <div class="stage-badge" id="stage-badge" hidden>已修改，请重新拟合</div>
       </div>
-      <div class="stage-status" id="stage-status" hidden><span class="pixel-scale" title="按当前缩放显示的原图像素长度"><i id="scale-line" aria-hidden="true"></i><span id="scale-value"></span></span><span id="tool-hint"></span><span id="cursor-coordinates" aria-live="off" hidden></span></div>
+      <div class="stage-status" id="stage-status" hidden><span id="tool-hint"></span><span id="cursor-coordinates" hidden></span></div>
       <section class="results-panel" aria-label="测量结果">
         <div class="result-heading"><h2>测量结果 <span id="result-status" class="pill neutral">未测量</span></h2><span id="result-method"></span></div>
         <div class="angle-cards"><div class="angle-card left-result"><span><i class="legend-dot left-color"></i> 左侧接触角</span><strong id="left-angle">—</strong><small id="left-range"></small></div><div class="angle-card right-result"><span><i class="legend-dot right-color"></i> 右侧接触角</span><strong id="right-angle">—</strong><small id="right-range"></small></div><div class="angle-card mean-result"><span>双侧平均</span><strong id="mean-angle">—</strong><small id="angle-difference"></small></div></div>
@@ -68,7 +73,69 @@
   </main>
 
   <div id="toast" class="toast" role="status" hidden></div>
-  <dialog id="help-dialog"><div class="dialog-heading"><h2>使用帮助</h2><button class="icon-button" id="close-help" aria-label="关闭使用帮助" type="button"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="/static/icons.svg#x"/></svg></button></div><ol class="help-steps"><li><strong>导入图片</strong><p>选择或拖入液滴侧视图。支持 PNG、JPG、TIFF、BMP、WebP，<span id="upload-limit">每张最大 20 MB</span>。原图保留，测量记录与坐标存储在本机。</p></li><li><strong>确定基线</strong><p>系统按原图识别液滴位置，在两侧可见的基体边缘拟合表面。悬滴的接触角以两个接触点各自的表面切线为准。也可重新选取多个表面点，拖动点位后基线随之更新。</p></li><li><strong>自动拟合或手动打点</strong><p>自动模式直接运行拟合。手动模式可在任一段可见液滴边缘连续选点。达到 5 点会显示拟合轮廓，点击「计算接触角」生成结果。展开「打点坐标」可微调或导入点位。</p></li><li><strong>检查与导出</strong><p>检查拟合线、接触点、角度与敏感性范围，再导出标注图、CSV 或完整结果。接触角取液体内部的夹角。悬滴的敏感性范围包含轮廓拟合和表面定位的变化。</p></li></ol><div class="shortcut-list"><span><kbd>B</kbd> 基线</span><span><kbd>C</kbd> 轮廓打点</span><span><kbd>H</kbd> 平移</span><span><kbd>空格</kbd> 临时平移</span><span><kbd>⌘/Ctrl Z</kbd> 撤销</span><span><kbd>0</kbd> 适配</span><span><kbd>Ctrl / ⌘ + 滚轮</kbd> 缩放 25%–800%</span><span><kbd>方向键</kbd> 移点 1 px</span><span><kbd>Shift</kbd> 10 px</span><span><kbd>Alt</kbd> 0.1 px</span></div><span class="version" id="app-version"></span><button class="button primary" id="help-done" type="button">关闭</button></dialog>
-  <script type="module" src="/static/app.js?v=0.5.2"></script>
+  <dialog id="shortcuts-dialog" aria-labelledby="shortcuts-heading">
+    <div class="dialog-heading">
+      <h2 id="shortcuts-heading">快捷键</h2>
+      <form method="dialog"><button class="icon-button" aria-label="关闭快捷键目录"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="/static/icons.svg#x"/></svg></button></form>
+    </div>
+    <section class="shortcuts-section" aria-labelledby="canvas-shortcuts">
+      <h3 id="canvas-shortcuts">画布</h3>
+      <dl class="shortcut-list">
+        <div><dt>切换到平移</dt><dd><kbd>H</kbd></dd></div>
+        <div><dt>临时平移</dt><dd>按住 <kbd>空格</kbd> 拖动</dd></div>
+        <div><dt>适配画布</dt><dd><kbd>0</kbd></dd></div>
+        <div><dt>放大 / 缩小</dt><dd><kbd>+</kbd> 或 <kbd>=</kbd> / <kbd>−</kbd></dd></div>
+        <div><dt>滚轮缩放</dt><dd>按住 <kbd>⌘</kbd> 或 <kbd>Ctrl</kbd> 滚动</dd></div>
+      </dl>
+    </section>
+    <section class="shortcuts-section" aria-labelledby="point-shortcuts">
+      <h3 id="point-shortcuts">打点与编辑</h3>
+      <dl class="shortcut-list">
+        <div><dt>设置基线</dt><dd><kbd>B</kbd></dd></div>
+        <div><dt>轮廓打点</dt><dd><kbd>C</kbd></dd></div>
+        <div><dt>移动选中点 1 px</dt><dd><kbd>方向键</kbd></dd></div>
+        <div><dt>移动选中点 10 px</dt><dd><kbd>Shift</kbd> + <kbd>方向键</kbd></dd></div>
+        <div><dt>移动选中点 0.1 px</dt><dd><kbd>Alt</kbd> + <kbd>方向键</kbd></dd></div>
+        <div><dt>删除选中点</dt><dd><kbd>Delete</kbd> 或 <kbd>Backspace</kbd></dd></div>
+        <div><dt>撤销</dt><dd><kbd>⌘</kbd> 或 <kbd>Ctrl</kbd> + <kbd>Z</kbd></dd></div>
+        <div><dt>重做</dt><dd><kbd>⌘</kbd> 或 <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd><br><kbd>⌘</kbd> 或 <kbd>Ctrl</kbd> + <kbd>Y</kbd></dd></div>
+      </dl>
+    </section>
+  </dialog>
+  <dialog id="tutorial-dialog" aria-labelledby="tutorial-heading">
+    <div class="dialog-heading">
+      <h2 id="tutorial-heading">使用教程</h2>
+      <form method="dialog"><button class="button subtle compact">跳过教程</button></form>
+    </div>
+    <div class="tutorial-content" aria-live="polite">
+      <p id="tutorial-progress" class="tutorial-progress"></p>
+      <section class="tutorial-step">
+        <h3>导入液滴照片</h3>
+        <p>点击「导入图片」，或将液滴侧视图拖入画布。支持 PNG、JPG、TIFF、BMP 和 WebP，<span id="upload-limit">每张最大 20 MB</span>。</p>
+      </section>
+      <section class="tutorial-step" hidden>
+        <h3>选择测量方式</h3>
+        <p>选择「自动拟合」或「手动打点」。通过「液滴位置」可指定座滴或悬滴。</p>
+      </section>
+      <section class="tutorial-step" hidden>
+        <h3>确认表面基线</h3>
+        <p>用「自动识别」定位表面。需要调整时，点「重新选点」并在液滴两侧的固体表面边缘打点。</p>
+      </section>
+      <section class="tutorial-step" hidden>
+        <h3>拟合并计算</h3>
+        <p>自动模式点「开始自动拟合」。手动模式按 <kbd>C</kbd> 沿可见的液滴边缘选点，满 5 点预览拟合轮廓，再点「计算接触角」。</p>
+      </section>
+      <section class="tutorial-step" hidden>
+        <h3>查看并导出结果</h3>
+        <p>在「测量结果」查看左右接触角和敏感性范围，可导出标注图、CSV 或完整结果。</p>
+      </section>
+    </div>
+    <div class="dialog-actions">
+      <span class="version" id="app-version"></span>
+      <button class="button subtle" id="tutorial-previous" type="button">上一步</button>
+      <button class="button primary" id="tutorial-next" type="button" autofocus>下一步</button>
+    </div>
+  </dialog>
+  <script type="module" src="/static/app.js?v=0.6.0"></script>
 </body>
 </html>

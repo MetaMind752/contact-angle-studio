@@ -1,8 +1,9 @@
 import {constrainView, zoomView, fitImageView, actualImageView} from './viewport.js';
 /* Contact Angle Studio. Every editable coordinate is an original-image pixel. */
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const COLORS = {left: '#d36c39', right: '#168c80', baseline: '#3c7cdb', contour: '#8662b0', both: '#96a6ba'};
-const DEFAULT_OPTIONS = {mode: 'auto', algorithm: 'general', orientation: 'auto', baseline: null, baseline_points: [], baseline_source: 'automatic', baseline_method: null, contour_points: [], left_points: [], right_points: [], manual_method: 'spline', sensitivity: true, polarity: 'dark', roi: null, excluded_regions: []};
+const COLORS = {left: '#d36c39', right: '#168c80', baseline: '#3c7cdb', contour: '#c62d35', both: '#96a6ba'};
+const MANUAL_METHOD = 'ellipse';
+const DEFAULT_OPTIONS = {mode: 'auto', algorithm: 'general', orientation: 'auto', baseline: null, baseline_points: [], baseline_source: 'automatic', baseline_method: null, contour_points: [], left_points: [], right_points: [], manual_method: MANUAL_METHOD, sensitivity: true, polarity: 'dark', roi: null, excluded_regions: []};
 const GROUP_NAMES = {baseline: '表面', contour: '轮廓'};
 const MIN_CONTOUR_POINTS = 5;
 const TOOL_HINTS = {pan: '', baseline: '在液滴两侧的固体表面边缘选点', contour: '沿可见的液滴边缘选点', roi: '框选完整液滴及接触线'};
@@ -40,7 +41,7 @@ export function fittedSurfaceLine(points) {
 function syncBaseline(options) { options.baseline = fittedSurfaceLine(options.baseline_points || []); }
 function setPoints(options, group, points) {
   if (group === 'baseline') { options.baseline_points=points; options.baseline_method=null; syncBaseline(options); }
-  else { options.contour_points=points; options.manual_method='spline'; options.left_points=[]; options.right_points=[]; }
+  else { options.contour_points=points; options.manual_method=MANUAL_METHOD; options.left_points=[]; options.right_points=[]; }
 }
 function loadedOptions(input = {}) {
   const options={...clone(DEFAULT_OPTIONS),...clone(input)};
@@ -289,6 +290,9 @@ function queueContourPreview(cache) {
     ? (isPendant(cache) ? 'pendant' : 'sessile')
     : options.orientation;
   const body = {contour_points: options.contour_points, baseline: options.baseline, orientation};
+  if (orientation === 'pendant' && cache.preview?.key === surfaceKey(options)) {
+    body.surface_curve = cache.preview.curve;
+  }
   const key = JSON.stringify(body);
   if (cache.contourPreview?.key === key) return;
   cancelContourPreview(cache);
@@ -339,7 +343,7 @@ async function estimateBaseline(announce = true) {
 }
 function setTool(tool) {
   if (!active()?.loaded) return;
-  if (tool === 'contour' && active().options.mode !== 'manual') edit((o) => { o.mode='manual'; o.manual_method='spline'; });
+  if (tool === 'contour' && active().options.mode !== 'manual') edit((o) => { o.mode='manual'; o.manual_method=MANUAL_METHOD; });
   if (tool === 'baseline') {
     const cache = active(), measured = cache.result?.baseline_points;
     if (measured?.length && cache.options.baseline_source === 'automatic' &&
@@ -461,11 +465,6 @@ function applyView() {
   const v=state.view; $('image-canvas').setAttribute('viewBox',[v.x,v.y,v.w,v.h].join(' '));
   const scale=stageSize().width/v.w;
   setText('zoom-value',Math.round(scale*100)+'%');
-  const availablePixels = Math.min(activeImage().width, 64 / scale);
-  const magnitude = 10 ** Math.floor(Math.log10(availablePixels));
-  const barPixels = [5, 2, 1].find(step => step * magnitude <= availablePixels) * magnitude;
-  $('scale-line').style.width = (barPixels * scale) + 'px';
-  setText('scale-value', barPixels + ' px');
   $('zoom-out').disabled=scale<=.250001; $('zoom-in').disabled=scale>=7.99999;
 }
 function zoom(factor, anchor) {
@@ -534,8 +533,12 @@ function renderStage() {
     geometry.append(svg('path', {d: pathData(contourPreview), class: 'fit-path manual-preview-path'}));
   }
   if (result) {
+    const manual = (result.mode || o.mode) === 'manual';
     for (const item of result.geometry?.contours || []) geometry.append(svg('path',{d:pathData(item.points || []),class:'contour-path'}));
-    for (const item of result.geometry?.fits || []) geometry.append(svg('path',{d:pathData(item.points || []),class:'fit-path',stroke:COLORS[item.side] || COLORS.both}));
+    for (const item of result.geometry?.fits || []) {
+      const style = manual ? {class: 'fit-path manual-fit-path'} : {class: 'fit-path', stroke: COLORS[item.side] || COLORS.both};
+      geometry.append(svg('path', {d: pathData(item.points || []), ...style}));
+    }
     for (const side of ['left','right']) {
       const r = result[side]; if (!r?.contact_point) continue;
       const p = r.contact_point, tangent = r.tangent_vector;
@@ -693,8 +696,8 @@ function renderRun() {
 }
 async function runMeasurement() {
   const image=activeImage(),cache=active();if(!image||!cache||cache.pendingJob)return;
-  if(cache.options.mode==='manual')cache.options.manual_method='spline';
   const error=validateReady(cache);if(error){cache.error=error;renderRun();notify(error,true);return;}
+  if (cache.options.mode === 'manual') cache.options.manual_method = MANUAL_METHOD;
   const id=image.id,options=payload(cache.options),snapshot=optionSignature(options);
   cache.error=null;cache.pendingJob={id:null,state:'queued',snapshot};renderRun();renderResults();
   try{
@@ -784,12 +787,12 @@ export function normalizeCoordinateInput(raw,width,height,current=DEFAULT_OPTION
   }
   if ('excluded_regions' in data) touched = true;
   if(!touched)throw new Error('请提供 baseline_points、contour_points 或 excluded_regions 字段。');
-  for(const[key,allowed]of Object.entries({mode:['auto','manual'],algorithm:['general','fibrous','local'],orientation:['auto','pendant','sessile'],manual_method:['spline','quadratic','cubic','tangent'],polarity:['dark','light']})){
+  for(const[key,allowed]of Object.entries({mode:['auto','manual'],algorithm:['general','fibrous','local'],orientation:['auto','pendant','sessile'],manual_method:[MANUAL_METHOD,'spline','quadratic','cubic','tangent'],polarity:['dark','light']})){
     if(key in data){if(!allowed.includes(data[key]))throw new Error('不支持的选项：'+key);result[key]=data[key];}
   }
   if(typeof data.sensitivity==='boolean')result.sensitivity=data.sensitivity;
   if((data.contour_points?.length||data.left_points?.length||data.right_points?.length)&&!('mode'in data))result.mode='manual';
-  if(data.contour_points?.length) { result.manual_method='spline'; result.left_points=[]; result.right_points=[]; }
+  if(data.contour_points?.length) { result.manual_method=MANUAL_METHOD; result.left_points=[]; result.right_points=[]; }
   if(('left_points' in data||'right_points' in data)&&!('contour_points' in data)) result.contour_points=[...result.left_points].sort((a,b)=>b.y-a.y).concat([...result.right_points].sort((a,b)=>a.y-b.y));
   if('baseline_points' in data || 'baseline' in data) {
     result.baseline_source = data.baseline_source === 'automatic' ? 'automatic' : 'manual';
@@ -830,7 +833,7 @@ function exportCoordinates(){
   downloadObject({format:'contact-angle-studio-coordinates-v1',image:{filename:image.filename,width:image.width,height:image.height,sha256:image.sha256},options:payload(cache.options)},image.filename.replace(/\.[^.]+$/,'')+'.coordinates.json');
 }
 function keyboard(event){
-  const tag=event.target.tagName;if(['INPUT','TEXTAREA','SELECT'].includes(tag)||event.target.isContentEditable||$('help-dialog').open)return;
+  const tag=event.target.tagName;if(['INPUT','TEXTAREA','SELECT'].includes(tag)||event.target.isContentEditable||document.querySelector('dialog[open]'))return;
   if(!active()?.loaded)return;
   if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='z'){event.preventDefault();undo(event.shiftKey);return;}
   if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='y'){event.preventDefault();undo(true);return;}
@@ -848,6 +851,48 @@ function keyboard(event){
     edit((o)=>{const points=pointsFor(o,selected.group);points[selected.index]=boundedPoint({x:p.x+delta[0],y:p.y+delta[1]});setPoints(o,selected.group,points);if(selected.group==='baseline')o.baseline_source='manual';},{focusCanvas:true});
   }
 }
+function setupGuides() {
+  const tutorial = $('tutorial-dialog');
+  const shortcuts = $('shortcuts-dialog');
+  const seenKey = 'contact-angle-studio.tutorial-seen';
+  const steps = [...tutorial.querySelectorAll('.tutorial-step')];
+  const previous = $('tutorial-previous');
+  const next = $('tutorial-next');
+  let index = 0;
+
+  function showStep() {
+    steps.forEach((step, stepIndex) => { step.hidden = stepIndex !== index; });
+    setText('tutorial-progress', '第 ' + (index + 1) + ' / ' + steps.length + ' 步');
+    previous.disabled = index === 0;
+    next.textContent = index === steps.length - 1 ? '完成' : '下一步';
+  }
+  function openTutorial() {
+    index = 0;
+    showStep();
+    tutorial.showModal();
+  }
+  $('tutorial-button').addEventListener('click', openTutorial);
+  $('shortcuts-button').addEventListener('click', () => shortcuts.showModal());
+  previous.addEventListener('click', () => {
+    index -= 1;
+    showStep();
+  });
+  next.addEventListener('click', () => {
+    if (index === steps.length - 1) {
+      tutorial.close();
+      return;
+    }
+    index += 1;
+    showStep();
+  });
+  tutorial.addEventListener('close', () => {
+    try { localStorage.setItem(seenKey, '1'); } catch { /* Storage can be disabled. */ }
+  });
+
+  let seen;
+  try { seen = localStorage.getItem(seenKey); } catch { /* Storage can be disabled. */ }
+  if (!seen) openTutorial();
+}
 function boot(){
   for(const id of ['upload-button','empty-upload'])$(id).addEventListener('click',()=>$('file-input').click());
   $('file-input').addEventListener('change',(event)=>uploadFiles([...event.target.files]));
@@ -857,7 +902,7 @@ function boot(){
   document.querySelectorAll('button[data-tool]').forEach((button)=>button.addEventListener('click',()=>setTool(button.dataset.tool)));
   document.querySelectorAll('[data-point-tab]').forEach((button)=>button.addEventListener('click',()=>{state.pointTab=button.dataset.pointTab;renderPoints();}));
   $('mode-auto').addEventListener('click',()=>{if(active()?.options.mode!=='auto')edit((o)=>{o.mode='auto';});if(state.tool === 'contour')setTool('pan');});
-  $('mode-manual').addEventListener('click',()=>{if(active()?.options.mode!=='manual')edit((o)=>{o.mode='manual';o.manual_method='spline';});setTool('contour');});
+  $('mode-manual').addEventListener('click',()=>{if(active()?.options.mode!=='manual')edit((o)=>{o.mode='manual';o.manual_method=MANUAL_METHOD;});setTool('contour');});
   $('algorithm-select').addEventListener('change',event=>edit(o=>{o.algorithm=event.target.value;}));
   for (const [id,key] of [['orientation-select','orientation'],['polarity-select','polarity']]) {
     $(id).addEventListener('change',event=>{
@@ -917,9 +962,8 @@ function boot(){
   document.addEventListener('dragover',(event)=>{if(event.dataTransfer?.types.includes('Files')){event.preventDefault();event.dataTransfer.dropEffect='copy';}});
   document.addEventListener('dragleave',(event)=>{if(event.dataTransfer?.types.includes('Files')){dragDepth=Math.max(0,dragDepth-1);if(!dragDepth)visible('drop-overlay',false);}});
   document.addEventListener('drop',(event)=>{if(event.dataTransfer?.files.length){event.preventDefault();dragDepth=0;visible('drop-overlay',false);uploadFiles([...event.dataTransfer.files]);}});
-  $('help-button').addEventListener('click',()=>$('help-dialog').showModal());$('close-help').addEventListener('click',()=>$('help-dialog').close());$('help-done').addEventListener('click',()=>$('help-dialog').close());
-  $('help-dialog').addEventListener('click',(event)=>{if(event.target===$('help-dialog')){const r=$('help-dialog').getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)$('help-dialog').close();}});
   renderAll();
+  setupGuides();
   request('/api/info').then((info)=>{setText('app-version','v'+info.version);if(info.limits?.max_upload_bytes)state.maxUpload=info.limits.max_upload_bytes;setText('upload-limit','每张最大 '+Math.round(state.maxUpload/1024/1024)+' MB');}).catch(()=>{notify('无法连接本机服务，请从桌面重新打开接触角工作台。',true);});
   refreshImages().catch((error)=>notify(error.message,true));
 }

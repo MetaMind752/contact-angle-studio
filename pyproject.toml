@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "contact-angle-core"
-version = "0.5.2"
+version = "0.6.0"
 description = "Local sessile and inverted contact angle measurement with OpenCV, SciPy and FastAPI"
 requires-python = ">=3.11"
 dependencies = [

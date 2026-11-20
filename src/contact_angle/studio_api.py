@@ -116,7 +116,9 @@ def preview_manual_contour(image_id: str, request: ContourPreviewRequest):
         width, height = image["width"], image["height"]
         options = request.model_dump(mode="json")
         xy = contour_observations(options["contour_points"], width, height)
-        fitted = preview_contour(xy, width, height, options["baseline"], request.orientation)
+        fitted = preview_contour(
+            xy, width, height, options["baseline"], request.orientation, options["surface_curve"]
+        )
         return {"points": [point(p) for p in fitted]}
     except (KeyError, MeasurementError) as exc:
         raise failure(exc) from exc

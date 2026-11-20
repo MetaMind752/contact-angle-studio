@@ -55,6 +55,7 @@ def pendant_job(gray, options):
         sensitivity=options["sensitivity"],
         contour_points=contours,
         excluded_regions=excluded,
+        manual_method=options.get("manual_method", "ellipse"),
     )
     for side in ("left", "right"):
         result[side]["contact_point"] = translated([result[side]["contact_point"]], x, y)[0]

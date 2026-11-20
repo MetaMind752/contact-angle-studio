@@ -242,10 +242,17 @@ def measure_manual(image, options):
         _error("invalid_options", "手动测量参数格式不正确。")
     height, width = image.shape[:2]
     method = options.get("manual_method", "quadratic")
-    if method == "spline" or options.get("contour_points"):
+    if method == "spline":
         from .contour_manual import measure_contour
 
         return measure_contour(image, options)
+    if method == "ellipse" or options.get("contour_points"):
+        from .manual_arc import contour_observations, measure_marked_contour
+
+        xy = contour_observations(options.get("contour_points") or [], width, height)
+        return measure_marked_contour(
+            xy, width, height, options.get("baseline"), options.get("sensitivity", True)
+        )
     if method not in _DEGREES:
         _error("invalid_manual_method", "请选择二次曲线、三次曲线或直线切线。")
     baseline = options.get("baseline")

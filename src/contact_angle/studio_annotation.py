@@ -49,7 +49,10 @@ def annotate(image, result):
         line(curve["points"], (170, 160, 135), 1)
     colors = {"left": (28, 155, 230), "right": (170, 155, 20)}
     for curve in result["geometry"]["fits"]:
-        line(curve["points"], colors.get(curve["side"], (170, 150, 130)), thickness)
+        if result.get("mode") == "manual":
+            line(curve["points"], (53, 45, 198), max(1, round(scale)))
+        else:
+            line(curve["points"], colors.get(curve["side"], (170, 150, 130)), thickness)
     a, b = sorted(result["baseline"], key=lambda p: p["x"])
     along = point(b) - point(a)
     along /= np.linalg.norm(along)
